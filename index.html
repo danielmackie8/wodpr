@@ -838,5 +838,56 @@ setTimeout(function(){
 },50);
 
 </script>
+<script>
+// Load Firebase only on web (not in WKWebView local file)
+var isNativeApp = !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.signIn);
+if(!isNativeApp){
+  // Dynamically load Firebase JS only on web
+  var s1 = document.createElement('script');
+  s1.type = 'module';
+  s1.textContent = `
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDoc }
+      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDvFhPHOKlF8QcGpU-SlWwnqrzGinK0U5M",
+      authDomain: "wodpr-279f1.firebaseapp.com",
+      projectId: "wodpr-279f1",
+      storageBucket: "wodpr-279f1.firebasestorage.app",
+      messagingSenderId: "513914797231",
+      appId: "1:513914797231:web:d3fcaf5dc46b50fd81a85a"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
+
+    window._fbAuth = auth;
+    window._fbDb = db;
+    window._fbProvider = provider;
+    window._fbDoc = doc;
+    window._fbSetDoc = setDoc;
+    window._fbGetDoc = getDoc;
+    window._fbSignIn = () => signInWithPopup(auth, provider);
+    window._fbSignOut = () => signOut(auth);
+
+    onAuthStateChanged(auth, async (user) => {
+      window._fbUser = user || null;
+      if(user){
+        try{
+          const snap = await getDoc(doc(db, 'users', user.uid));
+          if(snap.exists() && window._applyCloudData) window._applyCloudData(snap.data());
+        }catch(e){ console.error('Load error', e); }
+      }
+      if(window._updateAuthUI) window._updateAuthUI();
+    });
+  `;
+  document.head.appendChild(s1);
+}
+</script>
 </body>
 </html>
