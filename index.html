@@ -797,21 +797,49 @@ function renderSettings(a){
 }
 function handleAuth(){
   if(window._fbUser){
-    // Already signed in - confirm sign out
     if(confirm('Sign out of '+window._fbUser.displayName+'?')){
-      if(window._fbSignOut)window._fbSignOut();
+      // iOS native sign out
+      if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.signOut){
+        window.webkit.messageHandlers.signOut.postMessage({});
+      } else if(window._fbSignOut){
+        window._fbSignOut();
+      }
     }
   }else{
-    // Sign in
-    if(window._fbSignIn){
+    // iOS native sign in
+    if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.signIn){
+      window.webkit.messageHandlers.signIn.postMessage({});
+    } else if(window._fbSignIn){
       window._fbSignIn().catch(function(e){
         if(e.code!=='auth/popup-closed-by-user')alert('Sign in failed: '+e.message);
       });
-    }else{
+    } else {
       alert('Auth not loaded yet, please wait a moment and try again.');
     }
   }
 }
+
+// Called by native iOS after successful Google Sign-In
+window._onNativeSignIn = function(uid, name, photo){
+  window._fbUser = {uid:uid, displayName:name, photoURL:photo};
+  // Load cloud data for this user
+  if(window._fbDb&&window._fbDoc&&window._fbGetDoc){
+    window._fbGetDoc(window._fbDoc(window._fbDb,'users',uid)).then(function(snap){
+      if(snap.exists()&&window._applyCloudData) window._applyCloudData(snap.data());
+      else render();
+    }).catch(function(){ render(); });
+  } else {
+    render();
+  }
+  if(window._updateAuthUI) window._updateAuthUI();
+};
+
+// Called by native iOS after sign out
+window._onNativeSignOut = function(){
+  window._fbUser = null;
+  if(window._updateAuthUI) window._updateAuthUI();
+  render();
+};
 
 window._updateAuthUI = function(){
   const btn=document.getElementById('auth-btn');
