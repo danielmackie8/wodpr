@@ -151,55 +151,6 @@ textarea.inp{resize:none}
 .rest-timer-clock.done{color:var(--green)}
 .rest-timer-start{padding:8px 16px;background:var(--lime);border:none;border-radius:8px;font-family:'Bebas Neue',cursive;font-size:16px;letter-spacing:1px;color:#000;cursor:pointer}
 .rest-timer-start.running{background:var(--red);color:#fff}</style>
-<!-- Firebase -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
-    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-  import { getFirestore, doc, setDoc, getDoc }
-    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyDvFhPHOKlF8QcGpU-SlWwnqrzGinK0U5M",
-    authDomain: "wodpr-279f1.firebaseapp.com",
-    projectId: "wodpr-279f1",
-    storageBucket: "wodpr-279f1.firebasestorage.app",
-    messagingSenderId: "513914797231",
-    appId: "1:513914797231:web:d3fcaf5dc46b50fd81a85a"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
-  const provider = new GoogleAuthProvider();
-
-  // Expose to global scope so the main script can use them
-  window._fbAuth = auth;
-  window._fbDb = db;
-  window._fbProvider = provider;
-  window._fbDoc = doc;
-  window._fbSetDoc = setDoc;
-  window._fbGetDoc = getDoc;
-  window._fbSignIn = () => signInWithPopup(auth, provider);
-  window._fbSignOut = () => signOut(auth);
-
-  // Listen for auth state changes
-  onAuthStateChanged(auth, async (user) => {
-    window._fbUser = user || null;
-    if (user) {
-      // User signed in - load their cloud data
-      try {
-        const snap = await getDoc(doc(db, 'users', user.uid));
-        if (snap.exists()) {
-          const d = snap.data();
-          if (window._applyCloudData) window._applyCloudData(d);
-        }
-      } catch(e) { console.error('Load error', e); }
-    }
-    // Update UI
-    if (window._updateAuthUI) window._updateAuthUI();
-  });
-</script>
 </head>
 <body>
 <div id="splash" style="position:fixed;inset:0;background:#080808;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity .4s ease">
@@ -265,10 +216,15 @@ window._applyCloudData = function(d){
 };
 async function save(){
   const data={currentWod:S.currentWod,completedWods:S.completedWods,results:S.results,prs:S.prs,hist:S.hist,maxLifts:S.maxLifts};
+  const json=JSON.stringify(data);
   // Always save locally
-  try{localStorage.setItem('wodpr9',JSON.stringify(data));}catch(e){}
-  // Save to Firestore if signed in
-  if(window._fbUser&&window._fbDb&&window._fbDoc&&window._fbSetDoc){
+  try{localStorage.setItem('wodpr9',json);}catch(e){}
+  // Save to Firestore via native bridge if on iOS
+  if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.saveData&&window._fbUser){
+    window.webkit.messageHandlers.saveData.postMessage(json);
+  }
+  // Save to Firestore via Firebase JS if on web
+  else if(window._fbUser&&window._fbDb&&window._fbDoc&&window._fbSetDoc){
     try{
       await window._fbSetDoc(window._fbDoc(window._fbDb,'users',window._fbUser.uid),data);
     }catch(e){console.error('Firestore save error',e);}
@@ -796,25 +752,27 @@ function renderSettings(a){
   a.innerHTML='<div><div class="hdr">SETTINGS</div>'+syncRow+'<div class="setting-row"><div><div class="setting-lbl">Progress</div><div class="setting-sub">Workouts completed</div></div><span class="setting-val">'+done+' / '+total+'</span></div><div class="setting-row"><div><div class="setting-lbl">Next Up</div><div class="setting-sub">'+esc(curWod.title.slice(0,34))+'</div></div><span class="setting-val">WOD '+curWod.n+'</span></div><div class="setting-row"><div><div class="setting-lbl">Remaining</div></div><span class="setting-val">'+(total-done)+'</span></div><div class="setting-row"><div><div class="setting-lbl">Weight Unit</div></div><span style="font-size:14px;color:var(--lime);font-weight:700;letter-spacing:1px">KILOGRAMS</span></div><div style="padding:16px 16px 10px"><div style="font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:10px;font-weight:700">JUMP TO WORKOUT</div><div class="row"><input id="ji" type="number" class="inp" placeholder="WOD number 1 – '+total+'" style="font-size:16px"><button class="btn-ghost" onclick="doJump()">Go</button></div></div><div style="padding:4px 16px 24px"><button class="btn-ghost" style="width:100%;padding:13px;color:var(--red);border-color:rgba(255,69,69,.25);font-size:13px" onclick="resetAll()">Reset All Data</button></div></div>';
 }
 function handleAuth(){
+  // Detect iOS WKWebView
+  var isNative=!!(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.signIn);
   if(window._fbUser){
     if(confirm('Sign out of '+window._fbUser.displayName+'?')){
-      // iOS native sign out
-      if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.signOut){
+      if(isNative){
         window.webkit.messageHandlers.signOut.postMessage({});
-      } else if(window._fbSignOut){
+      }else if(window._fbSignOut){
         window._fbSignOut();
       }
     }
   }else{
-    // iOS native sign in
-    if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.signIn){
+    if(isNative){
+      // Use native Google Sign-In sheet
       window.webkit.messageHandlers.signIn.postMessage({});
-    } else if(window._fbSignIn){
+    }else if(window._fbSignIn){
+      // Web - use Firebase popup
       window._fbSignIn().catch(function(e){
         if(e.code!=='auth/popup-closed-by-user')alert('Sign in failed: '+e.message);
       });
-    } else {
-      alert('Auth not loaded yet, please wait a moment and try again.');
+    }else{
+      alert('Sign in not available yet, please wait a moment.');
     }
   }
 }
@@ -822,13 +780,18 @@ function handleAuth(){
 // Called by native iOS after successful Google Sign-In
 window._onNativeSignIn = function(uid, name, photo){
   window._fbUser = {uid:uid, displayName:name, photoURL:photo};
-  // Load cloud data for this user
+  console.log('Native sign in: '+name);
+  // Try to load from Firestore if Firebase JS is available
   if(window._fbDb&&window._fbDoc&&window._fbGetDoc){
     window._fbGetDoc(window._fbDoc(window._fbDb,'users',uid)).then(function(snap){
       if(snap.exists()&&window._applyCloudData) window._applyCloudData(snap.data());
       else render();
-    }).catch(function(){ render(); });
+    }).catch(function(e){
+      console.log('Firestore load failed, using local data: '+e);
+      render();
+    });
   } else {
+    // Firebase JS not available (local file) - just use localStorage
     render();
   }
   if(window._updateAuthUI) window._updateAuthUI();
@@ -848,7 +811,7 @@ window._updateAuthUI = function(){
     // Signed in — show initial in lime circle
     const name=window._fbUser.displayName||'?';
     const initial=name[0].toUpperCase();
-    btn.innerHTML='<div style="width:22px;height:22px;border-radius:50%;background:var(--lime);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:#0a0a0a;flex-shrink:0">'+initial+'</div><span style="font-size:10px;font-weight:700;color:var(--lime);letter-spacing:.5px">SYNCED</span>';
+    btn.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#c8f135" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span style="font-size:10px;font-weight:700;color:var(--lime);letter-spacing:.5px">SYNCED</span>';
     btn.style.cssText='cursor:pointer;height:30px;border-radius:20px;background:var(--limefaint);border:1px solid rgba(200,241,53,.35);display:flex;align-items:center;justify-content:center;gap:5px;padding:0 10px;flex-shrink:0';
     btn.title='Signed in as '+name+' (tap to sign out)';
   }else{
