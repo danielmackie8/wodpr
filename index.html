@@ -207,7 +207,7 @@ textarea.inp{resize:none}
   <div style="font-size:12px;color:#444;letter-spacing:3px;text-transform:uppercase">Loading programme...</div>
 </div>
 <div id="app">
-  <div class="topbar"><div class="logo">WODPR</div><div style="display:flex;align-items:center;gap:8px"><div class="prog-pill" id="prog-pill">WOD 1 OF 241</div><div id="auth-btn" onclick="handleAuth()" style="cursor:pointer;width:32px;height:32px;border-radius:50%;background:var(--s3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0" title="Sign in with Google">&#128100;</div></div></div>
+  <div class="topbar"><div class="logo">WODPR</div><div style="display:flex;align-items:center;gap:8px"><div class="prog-pill" id="prog-pill">WOD 1 OF 241</div><div id="auth-btn" onclick="handleAuth()" style="cursor:pointer;height:30px;border-radius:20px;background:var(--s3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:5px;padding:0 10px;flex-shrink:0"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1a5 5 0 100 10A5 5 0 006 1zm0 1.5a1.75 1.75 0 110 3.5 1.75 1.75 0 010-3.5zM6 10a3.5 3.5 0 01-2.8-1.4A2.5 2.5 0 016 7.5a2.5 2.5 0 012.8 1.1A3.5 3.5 0 016 10z" fill="#666"/></svg><span style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px">SYNC</span></div></div></div>
   <div class="scroll" id="area"></div>
   <nav class="nav">
     <div class="nb on" id="nb-today"  onclick="go('today')"><div class="nb-icon">&#9711;</div><div class="nb-lbl">Today</div></div>
@@ -845,18 +845,16 @@ window._updateAuthUI = function(){
   const btn=document.getElementById('auth-btn');
   if(!btn)return;
   if(window._fbUser){
-    // Show profile photo or initial
-    const photo=window._fbUser.photoURL;
-    if(photo){
-      btn.innerHTML='<img src="'+photo+'" style="width:32px;height:32px;border-radius:50%;object-fit:cover">';
-    }else{
-      btn.innerHTML='<span style="font-size:13px;font-weight:700;color:var(--lime)">'+window._fbUser.displayName[0].toUpperCase()+'</span>';
-    }
-    btn.style.border='1px solid var(--lime)';
-    btn.title='Signed in as '+window._fbUser.displayName+' (tap to sign out)';
+    // Signed in — show initial in lime circle
+    const name=window._fbUser.displayName||'?';
+    const initial=name[0].toUpperCase();
+    btn.innerHTML='<div style="width:22px;height:22px;border-radius:50%;background:var(--lime);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:#0a0a0a;flex-shrink:0">'+initial+'</div><span style="font-size:10px;font-weight:700;color:var(--lime);letter-spacing:.5px">SYNCED</span>';
+    btn.style.cssText='cursor:pointer;height:30px;border-radius:20px;background:var(--limefaint);border:1px solid rgba(200,241,53,.35);display:flex;align-items:center;justify-content:center;gap:5px;padding:0 10px;flex-shrink:0';
+    btn.title='Signed in as '+name+' (tap to sign out)';
   }else{
-    btn.innerHTML='&#128100;';
-    btn.style.border='1px solid var(--border)';
+    // Signed out — subtle sync icon + text
+    btn.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0115-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/></svg><span style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px">SYNC</span>';
+    btn.style.cssText='cursor:pointer;height:30px;border-radius:20px;background:var(--s3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:5px;padding:0 10px;flex-shrink:0';
     btn.title='Sign in with Google to sync across devices';
   }
   render();
